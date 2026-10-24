@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Altar</title>
+<style>
+  :root {
+    --wall: #e9dfcf; --wall2: #ddd0ba; --wood: #8a5a33; --wood2: #6f4526;
+    --accent: #d97706; --ink: #2b2118; --paper: #fdfbf6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #241a12; color: var(--ink); overflow: hidden; }
+  header { height: 52px; display: flex; align-items: center; gap: 1rem; padding: 0 1rem;
+    background: #1e150e; color: #f5ead9; }
+  header h1 { font-size: 1.1rem; margin: 0; font-weight: 600; letter-spacing: .02em; }
+  header h1 span { font-weight: 400; color: #cbb894; font-size: .85rem; margin-left: .4rem; }
+  #count { color: #fbbf24; font-variant-numeric: tabular-nums; }
+  .spacer { flex: 1; }
+  button.btn { background: #3a2a1a; color: #f5ead9; border: 1px solid #5b4226;
+    padding: .45rem .9rem; border-radius: .4rem; cursor: pointer; font-size: .88rem; }
+  button.btn:hover { background: #4a3520; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1a1a; font-weight: 600; }
+  #scene { position: relative; height: calc(100vh - 52px); overflow: hidden; }
+  #wall { position: absolute; inset: 0 0 42% 0;
+    background: linear-gradient(180deg, var(--wall), var(--wall2)); }
+  #table { position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+    background: linear-gradient(180deg, var(--wood), var(--wood2));
+    border-top: 3px solid #a9764a;
+    box-shadow: inset 0 12px 24px rgba(0,0,0,.25); }
+  #fixed { position: absolute; inset: 0; pointer-events: none; }
+  .fixed { position: absolute; bottom: 42%; transform: translateX(-50%); }
+  .fixed svg { display: block; overflow: visible; }
+  .flame { transform-origin: 50% 90%; animation: flick 1.6s ease-in-out infinite; }
+  @keyframes flick {
+    0%, 100% { transform: scale(1) skewX(0deg); }
+    30% { transform: scale(1.06, 1.12) skewX(-2deg); }
+    60% { transform: scale(.94, .92) skewX(2deg); }
+  }
+  .smoke { animation: smoke 4s ease-in-out infinite; opacity: 0; }
+  .smoke.s2 { animation-delay: 2s; }
+  @keyframes smoke {
+    0% { opacity: 0; transform: translateY(4px); }
+    30% { opacity: .55; }
+    100% { opacity: 0; transform: translateY(-14px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flame, .smoke { animation: none; }
+  }
+  #images { position: absolute; inset: 0; }
+  .frame { position: absolute; transform-origin: bottom center; cursor: grab;
+    background: var(--paper); padding: 6px 6px 16px; border-radius: 2px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+    touch-action: none; user-select: none; -webkit-user-drag: none; }
+  .frame:active { cursor: grabbing; }
+  .frame img { display: block; width: 100%; height: auto; pointer-events: none; }
+  .frame.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .frame .handle, .frame .rm { display: none; position: absolute; border: none;
+    border-radius: 50%; cursor: pointer; align-items: center; justify-content: center; }
+  .frame.selected .handle, .frame.selected .rm { display: flex; }
+  .frame .handle { right: -10px; bottom: -10px; width: 22px; height: 22px;
+    background: var(--accent); color: #1a1a1a; cursor: nwse-resize; font-size: 13px; }
+  .frame .rm { right: -10px; top: -10px; width: 22px; height: 22px;
+    background: #1e150e; color: #f5ead9; font-size: 15px; line-height: 1; }
+  #hint { position: absolute; left: 50%; top: 30%; transform: translateX(-50%);
+    color: #6b5a44; background: rgba(255,255,255,.55); padding: .8rem 1.2rem;
+    border-radius: .6rem; font-size: .95rem; text-align: center; pointer-events: none; }
+  #veil { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(217,119,6,.18); border: 3px dashed var(--accent); z-index: 1000;
+    font-size: 1.3rem; color: #7c2d12; pointer-events: none; }
+  #veil.show { display: flex; }
+  #note { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%);
+    background: #1e150e; color: #f5ead9; padding: .5rem 1rem; border-radius: .4rem;
+    font-size: .88rem; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 1001; }
+  #note.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🕯️ Altar <span>drop images onto the window</span></h1>
+  <span id="count">0 / 30</span>
+  <div class="spacer"></div>
+  <button class="btn primary" id="add-btn">Add images</button>
+  <button class="btn" id="clear-btn">Clear all</button>
+</header>
+<div id="scene">
+  <div id="wall"></div>
+  <div id="table"></div>
+  <div id="fixed">
+    <!-- white candle -->
+    <div class="fixed" data-item="candle" style="left:6%;width:70px">
+      <svg viewBox="0 0 60 150" width="70" height="150">
+        <ellipse cx="30" cy="143" rx="26" ry="6" fill="#d4af6a"/>
+        <rect x="20" y="30" width="20" height="112" rx="4" fill="#fdfdf6" stroke="#e8e2d2"/>
+        <rect x="20" y="30" width="7" height="112" rx="3" fill="#efe9da"/>
+        <line x1="30" y1="30" x2="30" y2="20" stroke="#3a2a1a" stroke-width="2"/>
+        <path class="flame" d="M30 2 C 24 10, 22 16, 30 20 C 38 16, 36 10, 30 2 Z" fill="#f59e0b"/>
+        <path class="flame" d="M30 10 C 27 14, 27 17, 30 19 C 33 17, 33 14, 30 10 Z" fill="#fde68a"/>
+      </svg>
+    </div>
+    <!-- incense -->
+    <div class="fixed" data-item="incense" style="left:16%;width:80px">
+      <svg viewBox="0 0 80 120" width="80" height="120">
+        <path class="smoke" d="M58 18 C 50 10, 66 4, 58 -4" stroke="#cbd5e1" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path class="smoke s2" d="M58 18 C 66 10, 50 4, 58 -4" stroke="#cbd5e1" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <line x1="40" y1="104" x2="58" y2="20" stroke="#7c4a21" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="58" cy="20" r="2.5" fill="#f97316"/>
+        <ellipse cx="40" cy="108" rx="20" ry="5" fill="#5b4226"/>
+        <rect x="28" y="104" width="24" height="8" rx="3" fill="#7c5a36"/>
+      </svg>
+    </div>
+    <!-- bowl of 3 oranges -->
+    <div class="fixed" data-item="oranges" style="left:35%;width:120px">
+      <svg viewBox="0 0 120 110" width="120" height="110">
+        <circle cx="42" cy="48" r="17" fill="#f97316" stroke="#c2410c" stroke-width="1.5"/>
+        <circle cx="60" cy="36" r="17" fill="#fb923c" stroke="#c2410c" stroke-width="1.5"/>
+        <circle cx="78" cy="48" r="17" fill="#f97316" stroke="#c2410c" stroke-width="1.5"/>
+        <path d="M60 20 q 4 -6 10 -4" stroke="#16a34a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M15 55 Q60 112 105 55 Z" fill="#1d4ed8"/>
+        <ellipse cx="60" cy="55" rx="45" ry="6" fill="#3b82f6"/>
+        <rect x="48" y="100" width="24" height="6" rx="3" fill="#1e3a8a"/>
+      </svg>
+    </div>
+    <!-- bowl of rice -->
+    <div class="fixed" data-item="rice" style="left:60%;width:120px">
+      <svg viewBox="0 0 120 110" width="120" height="110">
+        <path d="M30 52 Q 42 34, 60 34 Q 78 34, 90 52 Z" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+        <path d="M40 44 q 4 -3 8 0 M 56 40 q 4 -3 8 0 M 68 45 q 4 -3 8 0" stroke="#cbd5e1" stroke-width="1.5" fill="none"/>
+        <path d="M15 55 Q60 112 105 55 Z" fill="#166534"/>
+        <ellipse cx="60" cy="55" rx="45" ry="6" fill="#22c55e"/>
+        <rect x="48" y="100" width="24" height="6" rx="3" fill="#14532d"/>
+      </svg>
+    </div>
+    <!-- green plant in a vase -->
+    <div class="fixed" data-item="plant" style="left:84%;width:100px">
+      <svg viewBox="0 0 100 170" width="100" height="170">
+        <path d="M50 70 C 40 50, 28 42, 20 30 C 34 32, 46 44, 50 62 Z" fill="#16a34a"/>
+        <path d="M50 70 C 50 44, 44 28, 50 12 C 56 28, 54 46, 50 62 Z" fill="#22c55e"/>
+        <path d="M50 70 C 60 50, 72 42, 80 30 C 66 32, 54 44, 50 62 Z" fill="#15803d"/>
+        <path d="M50 70 C 42 58, 34 56, 26 52 C 34 62, 42 66, 50 70 Z" fill="#4ade80"/>
+        <path d="M50 70 C 58 58, 66 56, 74 52 C 66 62, 58 66, 50 70 Z" fill="#4ade80"/>
+        <path d="M38 70 L62 70 L58 108 Q50 114 42 108 Z" fill="#b45309"/>
+        <rect x="36" y="66" width="28" height="8" rx="3" fill="#92400e"/>
+        <rect x="42" y="108" width="16" height="8" rx="3" fill="#92400e"/>
+      </svg>
+    </div>
+  </div>
+  <div id="images"></div>
+  <div id="hint">Drop images onto the window — they’ll join the altar.<br>Up to 30, drag to move, drag the corner to resize.</div>
+  <div id="veil">Drop to add to the altar</div>
+  <div id="note"></div>
+</div>
+<input type="file" id="file-input" hidden multiple accept="image/*">
+
+<script type="module">
+import { MAX_IMAGES, defaultPose, clampPose, acceptCount, nextId, createIdbStore } from '/src/altar.js';
+
+const $ = s => document.querySelector(s);
+const scene = $('#scene'), imagesEl = $('#images'), countEl = $('#count');
+const hintEl = $('#hint'), veilEl = $('#veil'), noteEl = $('#note');
+const store = createIdbStore();
+
+let images = []; // {id, dataUrl, x, w, tilt, bottom, aspect, z}
+let zTop = 0, selectedId = null, noteTimer = null;
+
+function sceneRect() { return scene.getBoundingClientRect(); }
+function sceneAspect() { const r = sceneRect(); return r.width / r.height; }
+function showNote(text) {
+  noteEl.textContent = text; noteEl.classList.add('show');
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => noteEl.classList.remove('show'), 3200);
+}
+function updateCount() {
+  countEl.textContent = `${images.length} / ${MAX_IMAGES}`;
+  hintEl.style.display = images.length ? 'none' : 'block';
+}
+function applyPose(el, img) {
+  el.style.left = `${img.x * 100}%`;
+  el.style.width = `${img.w * 100}%`;
+  el.style.bottom = `${(1 - img.bottom) * 100}%`;
+  el.style.transform = `rotate(${img.tilt}deg)`;
+  el.style.zIndex = img.z;
+}
+function renderImage(img) {
+  const el = document.createElement('div');
+  el.className = 'frame';
+  el.dataset.id = img.id;
+  el.innerHTML = `<img src="${img.dataUrl}" draggable="false" alt="">
+    <button class="rm" title="Remove">×</button>
+    <button class="handle" title="Resize">⤢</button>`;
+  applyPose(el, img);
+  el.querySelector('.rm').addEventListener('pointerdown', e => e.stopPropagation());
+  el.querySelector('.rm').addEventListener('click', e => { e.stopPropagation(); removeImage(img.id); });
+  el.querySelector('.handle').addEventListener('pointerdown', e => startResize(e, img, el));
+  el.addEventListener('pointerdown', e => startDrag(e, img, el));
+  imagesEl.appendChild(el);
+  return el;
+}
+function select(id) {
+  selectedId = id;
+  document.querySelectorAll('.frame').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+}
+function frameEl(id) { return imagesEl.querySelector(`.frame[data-id="${id}"]`); }
+
+function startDrag(e, img, el) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  select(img.id);
+  img.z = ++zTop; el.style.zIndex = img.z;
+  const r = sceneRect();
+  const grabDX = (e.clientX - r.left) / r.width - img.x;
+  const grabDBottom = img.bottom - (e.clientY - r.top) / r.height;
+  let moved = false;
+  const onMove = (ev) => {
+    const rr = sceneRect();
+    const fx = (ev.clientX - rr.left) / rr.width;
+    const fy = (ev.clientY - rr.top) / rr.height;
+    if (Math.abs(fx - ((e.clientX - r.left) / r.width)) > 0.002) moved = true;
+    const next = clampPose({ x: fx - grabDX, w: img.w, tilt: img.tilt, bottom: fy + grabDBottom },
+      rr.width / rr.height, img.aspect);
+    Object.assign(img, next);
+    applyPose(el, img);
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    if (moved) store.save(img);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+function startResize(e, img, el) {
+  e.preventDefault(); e.stopPropagation();
+  select(img.id);
+  img.z = ++zTop; el.style.zIndex = img.z;
+  const r = sceneRect();
+  const startW = img.w, startFX = (e.clientX - r.left) / r.width;
+  const onMove = (ev) => {
+    const rr = sceneRect();
+    const fx = (ev.clientX - rr.left) / rr.width;
+    const next = clampPose({ x: img.x, w: startW + (fx - startFX), tilt: img.tilt, bottom: img.bottom },
+      rr.width / rr.height, img.aspect);
+    Object.assign(img, next);
+    applyPose(el, img);
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    store.save(img);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+function removeImage(id) {
+  images = images.filter(i => i.id !== id);
+  frameEl(id)?.remove();
+  if (selectedId === id) selectedId = null;
+  store.remove(id);
+  updateCount();
+}
+
+async function downscale(file) {
+  const dataUrl = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+  const bmp = await new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = rej;
+    im.src = dataUrl;
+  });
+  if (!bmp.naturalWidth || !bmp.naturalHeight) return { dataUrl, aspect: 1 };
+  const maxSide = 1200;
+  const scale = Math.min(1, maxSide / Math.max(bmp.naturalWidth, bmp.naturalHeight));
+  if (scale === 1) return { dataUrl, aspect: bmp.naturalWidth / bmp.naturalHeight };
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(bmp.naturalWidth * scale);
+  cv.height = Math.round(bmp.naturalHeight * scale);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  const out = cv.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85);
+  return { dataUrl: out, aspect: cv.width / cv.height };
+}
+async function addFiles(fileList) {
+  const files = [...fileList].filter(f => f.type.startsWith('image/'));
+  if (!files.length) { showNote('That drop had no images in it.'); return; }
+  const n = acceptCount(images.length, files.length);
+  if (n < files.length) {
+    showNote(images.length >= MAX_IMAGES
+      ? `The altar is full (30). Remove an image to add more.`
+      : `Only room for ${n} more — ${files.length - n} skipped (30 max).`);
+  }
+  for (let i = 0; i < n; i++) {
+    try {
+      const { dataUrl, aspect } = await downscale(files[i]);
+      const pose = clampPose(defaultPose(images.length), sceneAspect(), aspect);
+      const img = { id: nextId(), dataUrl, aspect, ...pose, z: ++zTop };
+      images.push(img);
+      renderImage(img);
+      store.save(img);
+    } catch { showNote('One image could not be read — skipped.'); }
+  }
+  updateCount();
+}
+
+// drop + picker + keyboard
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; veilEl.classList.add('show'); });
+window.addEventListener('dragleave', e => { if (--dragDepth <= 0) { dragDepth = 0; veilEl.classList.remove('show'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; veilEl.classList.remove('show');
+  addFiles(e.dataTransfer.files);
+});
+$('#add-btn').onclick = () => $('#file-input').click();
+$('#file-input').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('#clear-btn').onclick = () => {
+  if (!images.length) return;
+  if (!confirm('Remove all images from the altar?')) return;
+  images = []; imagesEl.innerHTML = ''; selectedId = null;
+  store.clear(); updateCount();
+};
+scene.addEventListener('click', e => {
+  if (!e.target.closest('.frame')) select(null);
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) removeImage(selectedId);
+  if (e.key === 'Escape') select(null);
+});
+
+// restore
+(async () => {
+  try {
+    const saved = await store.load();
+    saved.sort((a, b) => (a.z || 0) - (b.z || 0));
+    for (const img of saved) {
+      if (!img.dataUrl || !img.aspect) continue;
+      images.push(img);
+      zTop = Math.max(zTop, img.z || 0);
+      renderImage(img);
+    }
+  } catch {}
+  updateCount();
+})();
+</script>
+</body>
+</html>
